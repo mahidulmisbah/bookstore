@@ -1,18 +1,8 @@
 const express = require('express')
 const router = express.Router()
-const multer = require('multer')
-const path = require('path')
-const fileSytem = require('fs')
-const Author = require('../models/author')
 const Book = require('../models/book')
-const uploadPath = path.join('public', Book.coverImageBasePath)
-const imageMimeTypes =['images/jpg','images/png','images/gif']
-const upload = new multer({
-    dest : uploadPath,
-    filterFile: (req,file,callback) =>{
-        callback(null,imageMimeTypes.includes(file.mimetype))
-    }
-})
+const Author = require('../models/author')
+const imageMimeTypes = ['image/jpeg', 'image/png', 'images/gif']
 
 // All book route
 router.get('/', async (req,res) =>{
@@ -48,23 +38,19 @@ router.get('/new', async (req,res) =>{
 })
 
 // create new book route(new book information save to database)
-router.post('/', upload.single('cover'), async (req,res) =>{
-    const filename = req.file != null ? req.file.filename : null
+router.post('/',async (req,res) =>{
     const book = new Book({
        title: req.body.title,
        author: req.body.author,
        publishDate: new Date(req.body.publishDate),
        pageCount: req.body.pageCount,
-       coverImageName : filename,
        description : req.body.description
    })
-
+   saveCover(book, req.body.cover)
    try{
         const newBook = await book.save()
         res.redirect('books')
    }catch{
-        if(book.coverImageName != null)
-            removeBookCover(book.coverImageName)
         addNewBookPage(res, new Book(), true )
    }
 })
@@ -89,7 +75,16 @@ function removeBookCover(filename)
     fileSytem.unlink(path.join(uploadPath, filename),err => {
         if(err)
             console.error(err)
-    })
+    }) 
 }
+
+function saveCover(book, coverEncoded) {
+    if (coverEncoded == null) return
+    const cover = JSON.parse(coverEncoded)
+    if (cover != null && imageMimeTypes.includes(cover.type)) {
+      book.coverImage = new Buffer.from(cover.data, 'base64')
+      book.coverImageType = cover.type
+    }
+  }
 
 module.exports = router
